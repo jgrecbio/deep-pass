@@ -30,19 +30,26 @@ class ResBlock(Layer):
 
 
 class Generator(Model):
-    def __init__(self, filters: int, kernel_size: int, output_dim: int):
+    def __init__(self, filters: int, kernel_size: int, output_dim: int,
+                 initializer: str = "he_normal"):
         super().__init__()
-        self.res1 = ResBlock(filters, kernel_size, name="gen_resblock1")
-        self.res2 = ResBlock(filters, kernel_size, name="gen_resblock2")
-        self.res3 = ResBlock(filters, kernel_size, name="gen_resblock3")
-        self.res4 = ResBlock(filters, kernel_size, name="gen_resblock4")
+        self.res1 = ResBlock(filters, kernel_size, name="gen_resblock1",
+                             kernel_initializer=initializer)
+        self.res2 = ResBlock(filters, kernel_size, name="gen_resblock2",
+                             kernel_initializer=initializer)
+        self.res3 = ResBlock(filters, kernel_size, name="gen_resblock3",
+                             kernel_initializer=initializer)
+        self.res4 = ResBlock(filters, kernel_size, name="gen_resblock4",
+                             kernel_initializer=initializer)
         self.res5 = ResBlock(filters, kernel_size, name="gen_resblock5",
-                             end_block=True)
+                             kernel_initializer=initializer, end_block=True)
         self.final_conv = Conv1D(filters, kernel_size, padding="same",
                                  activation="softmax",
                                  name="gen_final_conv")
         self.final_dense = TimeDistributed(
-            Dense(output_dim, activation="softmax")
+            Dense(output_dim, activation="softmax",
+                  kernel_initializer=initializer,
+                  bias_initializer=initializer)
         )
 
     def call(self, x):
@@ -55,16 +62,23 @@ class Generator(Model):
 
 
 class Discriminator(Model):
-    def __init__(self, filters, kernel_size):
+    def __init__(self, filters: int, kernel_size: int,
+                 initializer: str = "he_normal"):
         super().__init__()
-        self.res1 = ResBlock(filters, kernel_size, name="dis_resblock1")
-        self.res2 = ResBlock(filters, kernel_size, name="dis_resblock2")
-        self.res3 = ResBlock(filters, kernel_size, name="dis_resblock3")
-        self.res4 = ResBlock(filters, kernel_size, name="dis_resblock4")
+        self.res1 = ResBlock(filters, kernel_size, name="dis_resblock1",
+                             kernel_initializer=initializer)
+        self.res2 = ResBlock(filters, kernel_size, name="dis_resblock2",
+                             kernel_initializer=initializer)
+        self.res3 = ResBlock(filters, kernel_size, name="dis_resblock3",
+                             kernel_initializer=initializer)
+        self.res4 = ResBlock(filters, kernel_size, name="dis_resblock4",
+                             kernel_initializer=initializer)
         self.res5 = ResBlock(filters, kernel_size, name="dis_resblock5",
-                             end_block=True)
+                             kernel_initializer=initializer, end_block=True)
         self.flat = Flatten()
-        self.final_dense = Dense(2, activation="softmax", name="dis_final")
+        self.final_dense = Dense(2, activation="softmax", name="dis_final",
+                                 kernel_initializer=initializer,
+                                 bias_initializer=initializer)
 
     def call(self, x):
         x1 = self.res1(x)
