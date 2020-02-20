@@ -1,3 +1,4 @@
+from typing import Tuple
 import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import (Conv1D, Layer, concatenate,
@@ -88,6 +89,65 @@ class Discriminator(Model):
         x5 = self.res5(x4)
         x_flat = self.flat(x5)
         return self.final_dense(x_flat)
+
+
+def generator_loss(fake_x_pred: tf.Tensor) -> tf.Tensor:
+    return -tf.reduce_mean(fake_x_pred)
+
+
+def standard_wassertein(fake_pred, true_pred):
+    return tf.reduce_mean(fake_pred) - tf.reduce_mean(true_pred)
+
+
+def improved_wasserstein(discriminator: Discriminator,
+                         fake_inputs, real_inputs,
+                         batch_size: int = 32, lamb: int = 10):
+    alpha = tf.random_uniform(shape=[batch_size, 1, 1],
+                              minval=0., maxval=1.)
+
+    differences = fake_inputs - real_inputs
+    interpolates = real_inputs + (alpha*differences)
+    gradients = tf.gradients(discriminator(interpolates))
+    slopes = tf.sqrt(tf.reduce_sum(tf.square(gradients),
+                                   reduction_indices=[1, 2]))
+    gradient_penalty = tf.reduce_mean((slopes-1.)**2)
+    return lamb * gradient_penalty
+
+
+@tf.function
+def train_step(generator: Generator,
+               discriminator: Discriminator,
+               x: tf.Tensor,
+               noise: tf.Tensor,
+               batch_size: int = 32):
+    with tf.GradientTape() as gen_tape, tf.GradientTape() as dis_tape:
+        fake_x = generator(noise)
+        fake_x_pred = discriminator(fake_x)
+        x_pred = discriminator(x)
+
+        gen_loss = generator_loss(fake_x)
+        standard_dis_loss = standard_wassertein(fake_x_pred, x_pred)
+        im_dis_loss = improved_wasserstein(discriminator,
+                                           fake_x,
+                                           x,
+                                           batch_size)
+        imw_loss = standard_dis_loss + im_dis_loss
+
+        gen_tape.gradient(gen_loss, generator.trainable_variables)
+        dis_tape.gradient(imw_loss, discriminator.trainable_variables)
+
+
+def train(generator: Generator,
+          discriminator: Discriminator,
+          xs: tf.data.Dataset,
+          batch_size: int,
+          epochs: int = 1000) -> Tuple[Generator, Discriminator]:
+    for e in epochs:
+        for x in xs:
+            noise = tf.random.uniform(tf.shape(x), minval=0., maxval=1,
+                                      name="noise")
+            train_step(generator, discriminator, x, noise, batch_size)
+    return generator, discriminator
 
 
 if __name__ == "__main__":
