@@ -11,6 +11,10 @@ def get_dataset(client, bucket, key):
     client.download_file(bucket, key, key)
 
 
+def upload(client, fname, bucket, key):
+    client.upload_file(fname, bucket, key)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-b", "--bucket")

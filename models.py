@@ -14,6 +14,7 @@ from sklearn.model_selection import train_test_split
 from vectorization import (get_data, get_label_vectorizer,
                            get_ohe, vectorizes_psswds,
                            ohe_vectorizes, inv_transform)
+from utils import get_client, upload
 
 
 class ResBlock(Layer):
@@ -204,6 +205,10 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--test", action="store_true", default=False)
     parser.add_argument("-l", "--log-epoch", type=int, default=10000)
 
+    parser.add_argument("-g", "--generator", default="generator.h5")
+    parser.add_argument("-d", "--discriminator", default="discriminator.h5")
+    parser.add_argument("--bucket")
+
     args = parser.parse_args()
 
     logging.getLogger().setLevel(logging.INFO)
@@ -236,3 +241,11 @@ if __name__ == "__main__":
     generated_psswds = generate_psswds(trained_gen, 1000, 128,
                                        300, 14, i2l)
     logging.info(generated_psswds[:10])
+
+    trained_gen.save(args.generator, save_format="h5")
+    trained_dis.save(args.discriminator, save_format="h5")
+
+    if args.bucket:
+        client = get_client()
+        upload(client, args.generator, args.bucket, args.generator)
+        upload(client, args.discriminator, args.bucket, args.discriminator)
