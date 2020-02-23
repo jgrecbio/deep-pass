@@ -1,3 +1,4 @@
+import logging
 import argparse
 from typing import Tuple, List, Iterable, Dict
 from toolz import concat
@@ -162,7 +163,9 @@ def train(generator: Generator,
           discriminator: Discriminator,
           xs: List[np.ndarray],
           ohe: OneHotEncoder,
-          epochs: int = 1000) -> Tuple[Generator, Discriminator]:
+          i2l: Dict[int, str],
+          epochs: int = 10000,
+          log_epoch: int = 1000) -> Tuple[Generator, Discriminator]:
     for e in range(epochs):
         for x in xs:
             x = tf.convert_to_tensor(ohe_vectorizes(ohe, x), dtype=tf.float32)
@@ -170,6 +173,10 @@ def train(generator: Generator,
             noise = tf.random.uniform([r, c, 300], minval=0., maxval=1,
                                       name="noise")
             train_step(generator, discriminator, x, noise)
+            if e % log_epoch == 0:
+                examples = generate_psswds(generator, 10, 10, 300, c, i2l)
+                logging.info(examples)
+
     return generator, discriminator
 
 
@@ -193,27 +200,39 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-f", "--file")
     parser.add_argument("-b", "--batch-size", default=128, type=int)
-    parser.add_argument("-e", "--epochs", default=3000, type=int)
+    parser.add_argument("-e", "--epochs", default=300000, type=int)
     parser.add_argument("-t", "--test", action="store_true", default=False)
+    parser.add_argument("-l", "--log-epoch", type=int, default=10000)
 
     args = parser.parse_args()
 
+    logging.getLogger().setLevel(logging.INFO)
+
     data = get_data(args.file)
+    logging.info("dataset loaded")
     if args.test:
         data = data[:1000]
     l2i, i2l = get_label_vectorizer(data)
+    logging.info("vectorizer dicts generated")
     vec_data = vectorizes_psswds(data, l2i)
+
     ohe = get_ohe(vec_data)
+    logging.info("one-hot-encoder generated")
+
     train_data, test_data = train_test_split(vec_data)
     train_batch = construct_batches(train_data, args.batch_size)
+    logging.info("train-test splits generated")
 
     gen = Generator(128, 20, len(ohe.categories_[0]))
     dis = Discriminator(128, 20)
+    logging.info("generator and discriminator generated")
 
     trained_gen, trained_dis = train(gen, dis,
                                      train_batch,
                                      ohe,
-                                     args.epochs)
+                                     i2l,
+                                     args.epochs,
+                                     log_epoch=1)
     generated_psswds = generate_psswds(trained_gen, 1000, 128,
                                        300, 14, i2l)
-    print(generated_psswds[:10])
+    logging.info(generated_psswds[:10])
