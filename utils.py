@@ -8,7 +8,7 @@ def get_client():
 
 
 def get_dataset(client, bucket, key):
-    client.download(bucket, key, key)
+    client.download_file(bucket, key, key)
 
 
 if __name__ == "__main__":
