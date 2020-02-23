@@ -1,8 +1,18 @@
-from typing import Tuple
+import argparse
+from typing import Tuple, List, Iterable, Dict
+from toolz import concat
 import tensorflow as tf
+import numpy as np
+from math import ceil
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import (Conv1D, Layer, concatenate,
                                      Dense, Flatten, TimeDistributed)
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.model_selection import train_test_split
+
+from vectorization import (get_data, get_label_vectorizer,
+                           get_ohe, vectorizes_psswds,
+                           ohe_vectorizes, inv_transform)
 
 
 class ResBlock(Layer):
@@ -11,13 +21,16 @@ class ResBlock(Layer):
                  end_block: bool = False,
                  name: str = "resblock",
                  trainable: bool = True, dtype=None, dynamic=False,
+                 kernel_initializer: str = "he_normal",
                  **kwargs):
         super().__init__(trainable, name, dtype, dynamic, **kwargs)
         self.end_block = end_block
         self.conv1 = Conv1D(filters, kernel_size,
+                            kernel_initializer=kernel_initializer,
                             activation=activation,
                             name="conv1", padding="same")
         self.conv2 = Conv1D(filters, kernel_size,
+                            kernel_initializer=kernel_initializer,
                             padding="same", name="conv2")
 
     def call(self, x):
@@ -100,16 +113,18 @@ def standard_wassertein(fake_pred, true_pred):
 
 
 def improved_wasserstein(discriminator: Discriminator,
-                         fake_inputs, real_inputs,
-                         batch_size: int = 32, lamb: int = 10):
-    alpha = tf.random_uniform(shape=[batch_size, 1, 1],
+                         fake_inputs: tf.Tensor,
+                         real_inputs: tf.Tensor,
+                         batch_size: int = 128,
+                         lamb: int = 10) -> tf.Tensor:
+    alpha = tf.random.uniform(shape=[batch_size, 1, 1],
                               minval=0., maxval=1.)
 
     differences = fake_inputs - real_inputs
-    interpolates = real_inputs + (alpha*differences)
-    gradients = tf.gradients(discriminator(interpolates))
+    interpolates = real_inputs + tf.multiply(alpha, differences)
+    gradients = tf.gradients(discriminator(interpolates), [interpolates])[0]
     slopes = tf.sqrt(tf.reduce_sum(tf.square(gradients),
-                                   reduction_indices=[1, 2]))
+                                   axis=[1, 2]))
     gradient_penalty = tf.reduce_mean((slopes-1.)**2)
     return lamb * gradient_penalty
 
@@ -118,8 +133,8 @@ def improved_wasserstein(discriminator: Discriminator,
 def train_step(generator: Generator,
                discriminator: Discriminator,
                x: tf.Tensor,
-               noise: tf.Tensor,
-               batch_size: int = 32):
+               noise: tf.Tensor):
+    batch_size = tf.shape(x)[0]
     with tf.GradientTape() as gen_tape, tf.GradientTape() as dis_tape:
         fake_x = generator(noise)
         fake_x_pred = discriminator(fake_x)
@@ -137,25 +152,67 @@ def train_step(generator: Generator,
         dis_tape.gradient(imw_loss, discriminator.trainable_variables)
 
 
+def construct_batches(x: np.ndarray,
+                      batch_size: int = 128) -> Iterable[np.ndarray]:
+    for i in range(0, len(x), batch_size):
+        yield x[i: i + batch_size]
+
+
 def train(generator: Generator,
           discriminator: Discriminator,
-          xs: tf.data.Dataset,
-          batch_size: int,
+          xs: List[np.ndarray],
+          ohe: OneHotEncoder,
           epochs: int = 1000) -> Tuple[Generator, Discriminator]:
-    for e in epochs:
+    for e in range(epochs):
         for x in xs:
+            x = tf.convert_to_tensor(ohe_vectorizes(ohe, x), dtype=tf.float32)
             noise = tf.random.uniform(tf.shape(x), minval=0., maxval=1,
                                       name="noise")
-            train_step(generator, discriminator, x, noise, batch_size)
+            train_step(generator, discriminator, x, noise)
     return generator, discriminator
 
 
+def generate_psswds(generator: Generator,
+                    num_psswds: int,
+                    batch_size: int,
+                    depth: int,
+                    maxlen: int,
+                    i2l: Dict[int, str]) -> List[str]:
+    nb_batch = ceil(num_psswds / batch_size)
+    psswds = []
+    for b in range(nb_batch):
+        noise = tf.random.uniform([batch_size, maxlen, depth],
+                                  minval=0., maxval=1.)
+        fake_inputs = np.argmax(generator(noise), -1)
+        psswds.append(inv_transform(fake_inputs, i2l))
+    return list(concat(psswds))[:num_psswds]
+
+
 if __name__ == "__main__":
-    gen = Generator(128, 20, 26)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-f", "--file")
+    parser.add_argument("-b", "--batch-size", default=128, type=int)
+    parser.add_argument("-e", "--epochs", default=3000, type=int)
+    parser.add_argument("-t", "--test", action="store_true", default=False)
+
+    args = parser.parse_args()
+
+    data = get_data(args.file)
+    if args.test:
+        data = data[:1000]
+    l2i, i2l = get_label_vectorizer(data)
+    vec_data = vectorizes_psswds(data, l2i)
+    ohe = get_ohe(vec_data)
+    train_data, test_data = train_test_split(vec_data)
+    train_batch = construct_batches(train_data, args.batch_size)
+
+    gen = Generator(128, 20, len(ohe.categories_[0]))
     dis = Discriminator(128, 20)
 
-    x = tf.ones([32, 10, 26])
-    y = gen(x)
-    print(x.shape)
-    y_ = dis(y)
-    print(y_.shape)
+    trained_gen, trained_dis = train(gen, dis,
+                                     train_batch,
+                                     ohe,
+                                     args.epochs)
+    generated_psswds = generate_psswds(trained_gen, 1000, 128,
+                                       len(ohe.categories_[0]), 14, i2l)
+    print(generated_psswds[:10])

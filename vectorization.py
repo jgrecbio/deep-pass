@@ -20,6 +20,13 @@ def get_label_vectorizer(psswds: List[str],
     return label2index, index2label
 
 
+def inv_transform(vec_psswds: np.ndarray, i2l: Dict[int, str]) -> List[str]:
+    psswds = []
+    for i in range(vec_psswds.shape[0]):
+        psswds.append(''.join(list(map(lambda x: i2l[x], vec_psswds[i]))))
+    return psswds
+
+
 def vectorizes_psswds(psswds: List[str],
                       label2index: Dict[str, int],
                       maxlen: int = 14) -> np.ndarray:
@@ -48,7 +55,7 @@ def ohe_vectorizes(ohe: OneHotEncoder,
                    vec_psswds: np.ndarray) -> np.ndarray:
     r, c = vec_psswds.shape
     flat_psswds = vec_psswds.reshape((-1, 1))
-    return ohe.fit_transform(flat_psswds).reshape((r, c, -1))
+    return ohe.transform(flat_psswds).reshape((r, c, -1))
 
 
 def get_data(path: str) -> List[str]:
