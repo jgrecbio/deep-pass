@@ -166,7 +166,8 @@ def train(generator: Generator,
     for e in range(epochs):
         for x in xs:
             x = tf.convert_to_tensor(ohe_vectorizes(ohe, x), dtype=tf.float32)
-            noise = tf.random.uniform(tf.shape(x), minval=0., maxval=1,
+            r, c, _ = tf.shape(x)
+            noise = tf.random.uniform([r, c, 300], minval=0., maxval=1,
                                       name="noise")
             train_step(generator, discriminator, x, noise)
     return generator, discriminator
@@ -214,5 +215,5 @@ if __name__ == "__main__":
                                      ohe,
                                      args.epochs)
     generated_psswds = generate_psswds(trained_gen, 1000, 128,
-                                       len(ohe.categories_[0]), 14, i2l)
+                                       300, 14, i2l)
     print(generated_psswds[:10])
