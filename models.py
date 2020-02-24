@@ -6,7 +6,7 @@ import tensorflow as tf
 import numpy as np
 from math import ceil
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import (Conv1D, Layer, concatenate,
+from tensorflow.keras.layers import (Conv1D, Layer, concatenate, Input,
                                      Dense, Flatten, TimeDistributed)
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.model_selection import train_test_split
@@ -34,6 +34,20 @@ class ResBlock(Layer):
         self.conv2 = Conv1D(filters, kernel_size,
                             kernel_initializer=kernel_initializer,
                             padding="same", name="conv2")
+        self.config = {"filters": filters,
+                       "kernel_size": kernel_size,
+                       "end_block": end_block,
+                       "activation": activation,
+                       "kernel_initializer": kernel_initializer}
+
+    def get_config(self):
+        config = super(ResBlock, self).get_config()
+        config.update(self.config)
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)
 
     def call(self, x):
         x_c1 = self.conv1(tf.nn.relu(x))
@@ -45,65 +59,54 @@ class ResBlock(Layer):
             return concatenate([x, x_rescaled], -1)
 
 
-class Generator(Model):
-    def __init__(self, filters: int, kernel_size: int, output_dim: int,
-                 initializer: str = "he_normal"):
-        super().__init__()
-        self.res1 = ResBlock(filters, kernel_size, name="gen_resblock1",
-                             kernel_initializer=initializer)
-        self.res2 = ResBlock(filters, kernel_size, name="gen_resblock2",
-                             kernel_initializer=initializer)
-        self.res3 = ResBlock(filters, kernel_size, name="gen_resblock3",
-                             kernel_initializer=initializer)
-        self.res4 = ResBlock(filters, kernel_size, name="gen_resblock4",
-                             kernel_initializer=initializer)
-        self.res5 = ResBlock(filters, kernel_size, name="gen_resblock5",
-                             kernel_initializer=initializer, end_block=True)
-        self.final_conv = Conv1D(filters, kernel_size, padding="same",
-                                 activation="softmax",
-                                 name="gen_final_conv")
-        self.final_dense = TimeDistributed(
-            Dense(output_dim, activation="softmax",
-                  kernel_initializer=initializer,
-                  bias_initializer=initializer)
-        )
-
-    def call(self, x):
-        x1 = self.res1(x)
-        x2 = self.res2(x1)
-        x3 = self.res3(x2)
-        x4 = self.res4(x3)
-        x5 = self.res5(x4)
-        return self.final_dense(self.final_conv(x5))
+def get_generator(seq_len: int,
+                  depth: int,
+                  filters: int,
+                  kernel_size: int,
+                  output_dim: int,
+                  initializer: str = "he_normal") -> Model:
+    x = Input(shape=[seq_len, depth])
+    res1 = ResBlock(filters, kernel_size, name="gen_resblock1",
+                    kernel_initializer=initializer)(x)
+    res2 = ResBlock(filters, kernel_size, name="gen_resblock2",
+                    kernel_initializer=initializer)(res1)
+    res3 = ResBlock(filters, kernel_size, name="gen_resblock3",
+                    kernel_initializer=initializer)(res2)
+    res4 = ResBlock(filters, kernel_size, name="gen_resblock4",
+                    kernel_initializer=initializer)(res3)
+    res5 = ResBlock(filters, kernel_size, name="gen_resblock5",
+                    kernel_initializer=initializer,
+                    end_block=True)(res4)
+    final_conv = Conv1D(filters, kernel_size, padding="same",
+                        activation="softmax",
+                        name="gen_final_conv")(res5)
+    final_dense = TimeDistributed(
+        Dense(output_dim, activation="softmax",
+              kernel_initializer=initializer,
+              bias_initializer=initializer))(final_conv)
+    return Model(inputs=x, outputs=final_dense)
 
 
-class Discriminator(Model):
-    def __init__(self, filters: int, kernel_size: int,
-                 initializer: str = "he_normal"):
-        super().__init__()
-        self.res1 = ResBlock(filters, kernel_size, name="dis_resblock1",
-                             kernel_initializer=initializer)
-        self.res2 = ResBlock(filters, kernel_size, name="dis_resblock2",
-                             kernel_initializer=initializer)
-        self.res3 = ResBlock(filters, kernel_size, name="dis_resblock3",
-                             kernel_initializer=initializer)
-        self.res4 = ResBlock(filters, kernel_size, name="dis_resblock4",
-                             kernel_initializer=initializer)
-        self.res5 = ResBlock(filters, kernel_size, name="dis_resblock5",
-                             kernel_initializer=initializer, end_block=True)
-        self.flat = Flatten()
-        self.final_dense = Dense(2, activation="softmax", name="dis_final",
-                                 kernel_initializer=initializer,
-                                 bias_initializer=initializer)
-
-    def call(self, x):
-        x1 = self.res1(x)
-        x2 = self.res2(x1)
-        x3 = self.res3(x2)
-        x4 = self.res4(x3)
-        x5 = self.res5(x4)
-        x_flat = self.flat(x5)
-        return self.final_dense(x_flat)
+def get_discriminator(seq_len: int, depth: int,
+                      filters: int, kernel_size: int,
+                      initializer: str = "he_normal"):
+    x = Input(shape=[seq_len, depth])
+    res1 = ResBlock(filters, kernel_size, name="dis_resblock1",
+                    kernel_initializer=initializer)(x)
+    res2 = ResBlock(filters, kernel_size, name="dis_resblock2",
+                    kernel_initializer=initializer)(res1)
+    res3 = ResBlock(filters, kernel_size, name="dis_resblock3",
+                    kernel_initializer=initializer)(res2)
+    res4 = ResBlock(filters, kernel_size, name="dis_resblock4",
+                    kernel_initializer=initializer)(res3)
+    res5 = ResBlock(filters, kernel_size, name="dis_resblock5",
+                    kernel_initializer=initializer,
+                    end_block=True)(res4)
+    flat = Flatten()(res5)
+    final_dense = Dense(2, activation="softmax", name="dis_final",
+                        kernel_initializer=initializer,
+                        bias_initializer=initializer)(flat)
+    return Model(inputs=x, outputs=final_dense)
 
 
 def generator_loss(fake_x_pred: tf.Tensor) -> tf.Tensor:
@@ -114,7 +117,7 @@ def standard_wassertein(fake_pred, true_pred):
     return tf.reduce_mean(fake_pred) - tf.reduce_mean(true_pred)
 
 
-def improved_wasserstein(discriminator: Discriminator,
+def improved_wasserstein(discriminator: Model,
                          fake_inputs: tf.Tensor,
                          real_inputs: tf.Tensor,
                          batch_size: int = 128,
@@ -128,12 +131,14 @@ def improved_wasserstein(discriminator: Discriminator,
     slopes = tf.sqrt(tf.reduce_sum(tf.square(gradients),
                                    axis=[1, 2]))
     gradient_penalty = tf.reduce_mean((slopes-1.)**2)
-    return lamb * gradient_penalty
+    cost = lamb * gradient_penalty
+    print(cost)
+    return cost
 
 
 @tf.function
-def train_step(generator: Generator,
-               discriminator: Discriminator,
+def train_step(generator: Model,
+               discriminator: Model,
                x: tf.Tensor,
                noise: tf.Tensor):
     batch_size = tf.shape(x)[0]
@@ -160,13 +165,13 @@ def construct_batches(x: np.ndarray,
         yield x[i: i + batch_size]
 
 
-def train(generator: Generator,
-          discriminator: Discriminator,
+def train(generator: Model,
+          discriminator: Model,
           xs: List[np.ndarray],
           ohe: OneHotEncoder,
           i2l: Dict[int, str],
           epochs: int = 10000,
-          log_epoch: int = 1000) -> Tuple[Generator, Discriminator]:
+          log_epoch: int = 1000) -> Tuple[Model, Model]:
     for e in range(epochs):
         for x in xs:
             x = tf.convert_to_tensor(ohe_vectorizes(ohe, x), dtype=tf.float32)
@@ -181,7 +186,7 @@ def train(generator: Generator,
     return generator, discriminator
 
 
-def generate_psswds(generator: Generator,
+def generate_psswds(generator: Model,
                     num_psswds: int,
                     batch_size: int,
                     depth: int,
@@ -228,8 +233,8 @@ if __name__ == "__main__":
     train_batch = construct_batches(train_data, args.batch_size)
     logging.info("train-test splits generated")
 
-    gen = Generator(128, 20, len(ohe.categories_[0]))
-    dis = Discriminator(128, 20)
+    gen = get_generator(14, 300, 128, 20, len(ohe.categories_[0]))
+    dis = get_discriminator(14, len(ohe.categories_[0]), 128, 20)
     logging.info("generator and discriminator generated")
 
     trained_gen, trained_dis = train(gen, dis,
@@ -238,6 +243,7 @@ if __name__ == "__main__":
                                      i2l,
                                      args.epochs,
                                      log_epoch=1)
+    print(trained_gen.get_config())
     generated_psswds = generate_psswds(trained_gen, 1000, 128,
                                        300, 14, i2l)
     logging.info(generated_psswds[:10])
@@ -249,3 +255,7 @@ if __name__ == "__main__":
         client = get_client()
         upload(client, args.generator, args.bucket, args.generator)
         upload(client, args.discriminator, args.bucket, args.discriminator)
+
+    tf.keras.models.load_model(args.generator,
+                               custom_objects={"ResBlock": ResBlock},
+                               compile=False)
