@@ -50,8 +50,11 @@ def get_generator(seq_len: int,
                   initializer: str = "he_normal",
                   name: Optional[str] = None) -> Model:
     x = Input(shape=[seq_len, depth])
+    conv1 = Conv1D(filters, kernel_size, name="first_conv",
+                   kernel_initializer=initializer, padding="same",
+                   activation="relu")(x)
     res1 = ResBlock(filters, kernel_size, name="gen_resblock1",
-                    kernel_initializer=initializer)(x)
+                    kernel_initializer=initializer)(conv1)
     res2 = ResBlock(filters, kernel_size, name="gen_resblock2",
                     kernel_initializer=initializer)(res1)
     res3 = ResBlock(filters, kernel_size, name="gen_resblock3",
@@ -75,8 +78,11 @@ def get_discriminator(seq_len: int, depth: int,
                       initializer: str = "he_normal",
                       name: Optional[str] = None):
     x = Input(shape=[seq_len, depth])
+    conv1 = Conv1D(filters, kernel_size, name="first_conv",
+                   kernel_initializer=initializer, padding="same",
+                   activation="relu")(x)
     res1 = ResBlock(filters, kernel_size, name="dis_resblock1",
-                    kernel_initializer=initializer)(x)
+                    kernel_initializer=initializer)(conv1)
     res2 = ResBlock(filters, kernel_size, name="dis_resblock2",
                     kernel_initializer=initializer)(res1)
     res3 = ResBlock(filters, kernel_size, name="dis_resblock3",
