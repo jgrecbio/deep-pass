@@ -1,10 +1,11 @@
 import logging
 import argparse
-from typing import Tuple, List, Iterable, Dict
+from typing import Tuple, List, Iterable, Dict, Optional
 from toolz import concat
 import tensorflow as tf
 import numpy as np
 from math import ceil
+from tensorflow.keras.optimizers import RMSprop
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import (Conv1D, Layer, concatenate, Input,
                                      Dense, Flatten, TimeDistributed)
@@ -89,7 +90,8 @@ def get_generator(seq_len: int,
 
 def get_discriminator(seq_len: int, depth: int,
                       filters: int, kernel_size: int,
-                      initializer: str = "he_normal"):
+                      initializer: str = "he_normal",
+                      name: Optional[str] = None):
     x = Input(shape=[seq_len, depth])
     res1 = ResBlock(filters, kernel_size, name="dis_resblock1",
                     kernel_initializer=initializer)(x)
@@ -106,14 +108,15 @@ def get_discriminator(seq_len: int, depth: int,
     final_dense = Dense(2, activation="softmax", name="dis_final",
                         kernel_initializer=initializer,
                         bias_initializer=initializer)(flat)
-    return Model(inputs=x, outputs=final_dense)
+    return Model(inputs=x, outputs=final_dense, name=name)
 
 
 def generator_loss(fake_x_pred: tf.Tensor) -> tf.Tensor:
     return -tf.reduce_mean(fake_x_pred)
 
 
-def standard_wassertein(fake_pred, true_pred):
+def standard_wassertein(fake_pred: tf.Tensor,
+                        true_pred: tf.Tensor) -> tf.Tensor:
     return tf.reduce_mean(fake_pred) - tf.reduce_mean(true_pred)
 
 
@@ -132,15 +135,18 @@ def improved_wasserstein(discriminator: Model,
                                    axis=[1, 2]))
     gradient_penalty = tf.reduce_mean((slopes-1.)**2)
     cost = lamb * gradient_penalty
-    print(cost)
     return cost
 
 
 @tf.function
 def train_step(generator: Model,
                discriminator: Model,
+               generator_optimizer: RMSprop,
+               discriminator_optimizer: RMSprop,
                x: tf.Tensor,
-               noise: tf.Tensor):
+               noise: tf.Tensor,
+               gen_loss_storage: tf.keras.metrics.Mean,
+               dis_loss_storage: tf.keras.metrics.Mean):
     batch_size = tf.shape(x)[0]
     with tf.GradientTape() as gen_tape, tf.GradientTape() as dis_tape:
         fake_x = generator(noise)
@@ -148,15 +154,27 @@ def train_step(generator: Model,
         x_pred = discriminator(x)
 
         gen_loss = generator_loss(fake_x)
+        gen_loss_storage(gen_loss)
         standard_dis_loss = standard_wassertein(fake_x_pred, x_pred)
         im_dis_loss = improved_wasserstein(discriminator,
                                            fake_x,
                                            x,
                                            batch_size)
         imw_loss = standard_dis_loss + im_dis_loss
+        dis_loss_storage(imw_loss)
 
-        gen_tape.gradient(gen_loss, generator.trainable_variables)
-        dis_tape.gradient(imw_loss, discriminator.trainable_variables)
+        generator_gradients = gen_tape.gradient(
+            gen_loss, generator.trainable_variables
+        )
+        discriminator_gradients = dis_tape.gradient(
+            imw_loss, discriminator.trainable_variables
+        )
+        generator_optimizer.apply_gradients(
+            zip(generator_gradients, generator.trainable_variables)
+        )
+        discriminator_gradients.apply_gradients(
+            zip(discriminator_gradients, discriminator.trainable_variables)
+        )
 
 
 def construct_batches(x: np.ndarray,
@@ -170,18 +188,32 @@ def train(generator: Model,
           xs: List[np.ndarray],
           ohe: OneHotEncoder,
           i2l: Dict[int, str],
+          optimizers: Optional[Tuple[RMSprop, RMSprop]] = None,
           epochs: int = 10000,
           log_epoch: int = 1000) -> Tuple[Model, Model]:
+    if optimizers:
+        generator_optimizer, discriminator_optimizer = optimizers
+
+    gen_loss_storage = tf.keras.metrics.Mean(name="generator_loss")
+    dis_loss_storage = tf.keras.metrics.Mean(name="discriminator_loss")
+
     for e in range(epochs):
+        gen_loss_storage.reset_states()
+        dis_loss_storage.reset_states()
         for x in xs:
             x = tf.convert_to_tensor(ohe_vectorizes(ohe, x), dtype=tf.float32)
             r, c, _ = tf.shape(x)
-            noise = tf.random.uniform([r, c, 300], minval=0., maxval=1,
+            noise = tf.random.uniform([r, c, 300],
+                                      minval=0., maxval=1,
                                       name="noise")
-            train_step(generator, discriminator, x, noise)
-            if e % log_epoch == 0:
-                examples = generate_psswds(generator, 10, 10, 300, c, i2l)
-                logging.info(examples)
+            train_step(generator, discriminator,
+                       generator_optimizer, discriminator_optimizer,
+                       x, noise,
+                       gen_loss_storage,
+                       dis_loss_storage)
+        if e % log_epoch == 0:
+            examples = generate_psswds(generator, 10, 10, 300, c, i2l)
+            logging.info(examples)
 
     return generator, discriminator
 
@@ -233,8 +265,10 @@ if __name__ == "__main__":
     train_batch = construct_batches(train_data, args.batch_size)
     logging.info("train-test splits generated")
 
-    gen = get_generator(14, 300, 128, 20, len(ohe.categories_[0]))
-    dis = get_discriminator(14, len(ohe.categories_[0]), 128, 20)
+    gen = get_generator(14, 300, 128, 20, len(ohe.categories_[0]),
+                        name="generator")
+    dis = get_discriminator(14, len(ohe.categories_[0]), 128, 20,
+                            name="discriminator")
     logging.info("generator and discriminator generated")
 
     trained_gen, trained_dis = train(gen, dis,
@@ -242,8 +276,7 @@ if __name__ == "__main__":
                                      ohe,
                                      i2l,
                                      args.epochs,
-                                     log_epoch=1)
-    print(trained_gen.get_config())
+                                     log_epoch=args.log_epoch)
     generated_psswds = generate_psswds(trained_gen, 1000, 128,
                                        300, 14, i2l)
     logging.info(generated_psswds[:10])
