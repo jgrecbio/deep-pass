@@ -23,6 +23,11 @@ parser.add_argument("-d", "--discriminator", default="discriminator.h5")
 parser.add_argument("--bucket")
 parser.add_argument("--tensorboard", action="store_true", default=False)
 
+parser.add_argument("--noise-size", type=int, default=300)
+parser.add_argument("--filters", type=int, default=128)
+parser.add_argument("--sequence-len", type=int, default=14)
+parser.add_argument("--kernel-size", type=int, default=5)
+
 args = parser.parse_args()
 
 logging.getLogger().setLevel(logging.DEBUG)
@@ -34,7 +39,7 @@ if args.tensorboard:
 data = get_data(args.file)
 logging.info("dataset loaded")
 if args.test:
-    data = data[:1000]
+    data = data[:10000]
 l2i, i2l = get_label_vectorizer(data)
 logging.info("vectorizer dicts generated")
 vec_data = vectorizes_psswds(data, l2i)
@@ -45,21 +50,27 @@ logging.info("one-hot-encoder generated")
 train_data, test_data = train_test_split(vec_data)
 logging.info("train-test splits generated")
 
-gen = get_generator(14, 300, 128, 20, len(ohe.categories_[0]),
+gen = get_generator(args.seq_len,
+                    args.noise_size,
+                    args.filters,
+                    args.kernel_size,
+                    len(ohe.categories_[0]),
                     name="generator")
-dis = get_discriminator(14, len(ohe.categories_[0]), 128, 20,
+dis = get_discriminator(args.seq_len,
+                        len(ohe.categories_[0]),
+                        args.filters,
+                        args.kernel_size,
                         name="discriminator")
 logging.info("generator and discriminator generated")
 
 trained_gen, trained_dis = train(gen, dis,
-                                 train_data,
-                                 ohe,
-                                 i2l,
+                                 args.noise_size, train_data,
+                                 ohe, i2l,
                                  train_writer=train_summary_writer,
                                  epochs=args.epochs,
                                  log_epoch=args.log_epoch)
-generated_psswds = generate_psswds(trained_gen, 1000, 128,
-                                   300, 14, i2l)
+generated_psswds = generate_psswds(trained_gen, 1000, args.batch_size,
+                                   args.noise_size, args.seq_len, i2l)
 logging.info(generated_psswds[:10])
 
 trained_gen.save(args.generator, save_format="h5")

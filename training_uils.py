@@ -73,6 +73,7 @@ def train_step(generator: Model,
 
 def train(generator: Model,
           discriminator: Model,
+          noise_size: int,
           features: np.ndarray,
           ohe: OneHotEncoder,
           i2l: Dict[int, str],
@@ -100,7 +101,7 @@ def train(generator: Model,
             logging.debug("batch: {}".format(i))
             x = tf.convert_to_tensor(ohe_vectorizes(ohe, x), dtype=tf.float32)
             r, c, _ = tf.shape(x)
-            noise = tf.random.uniform([r, c, 300],
+            noise = tf.random.uniform([r, c, noise_size],
                                       minval=0., maxval=1,
                                       name="noise")
             train_step(generator, discriminator,
