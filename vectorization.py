@@ -1,4 +1,5 @@
-from typing import List, Tuple, Dict
+from copy import deepcopy
+from typing import List, Tuple, Dict, Iterable
 from collections import Counter
 from toolz import concat
 
@@ -64,6 +65,14 @@ def get_data(path: str) -> List[str]:
         for line in f.readlines():
             psswds.append(line.split(' ')[-1].strip())
     return psswds
+
+
+def construct_batches(x: np.ndarray,
+                      batch_size: int = 128) -> Iterable[np.ndarray]:
+    x = deepcopy(x)
+    np.random.shuffle(x)
+    for i in range(0, len(x), batch_size):
+        yield x[i: i + batch_size]
 
 
 if __name__ == "__main__":
