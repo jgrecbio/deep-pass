@@ -2,20 +2,18 @@ from typing import Optional
 import tensorflow as tf
 
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import (Conv1D, Layer, concatenate, Input,
+from tensorflow.keras.layers import (Conv1D, Layer, Input,
                                      Dense, Flatten, TimeDistributed)
 
 
 class ResBlock(Layer):
     def __init__(self,
                  filters: int, kernel_size: int, activation: str = "relu",
-                 end_block: bool = False,
                  name: str = "resblock",
                  trainable: bool = True, dtype=None, dynamic=False,
                  kernel_initializer: str = "he_normal",
                  **kwargs):
         super().__init__(trainable, name, dtype, dynamic, **kwargs)
-        self.end_block = end_block
         self.conv1 = Conv1D(filters, kernel_size,
                             kernel_initializer=kernel_initializer,
                             activation=activation,
@@ -25,7 +23,6 @@ class ResBlock(Layer):
                             padding="same", name="conv2")
         self.config = {"filters": filters,
                        "kernel_size": kernel_size,
-                       "end_block": end_block,
                        "activation": activation,
                        "kernel_initializer": kernel_initializer}
 
@@ -42,10 +39,7 @@ class ResBlock(Layer):
         x_c1 = self.conv1(tf.nn.relu(x))
         x_c2 = self.conv2(x_c1)
         x_rescaled = 0.3 * x_c2
-        if self.end_block:
-            return x_rescaled
-        else:
-            return concatenate([x, x_rescaled], -1)
+        return x + x_rescaled
 
 
 def get_generator(seq_len: int,
@@ -65,8 +59,7 @@ def get_generator(seq_len: int,
     res4 = ResBlock(filters, kernel_size, name="gen_resblock4",
                     kernel_initializer=initializer)(res3)
     res5 = ResBlock(filters, kernel_size, name="gen_resblock5",
-                    kernel_initializer=initializer,
-                    end_block=True)(res4)
+                    kernel_initializer=initializer)(res4)
     final_conv = Conv1D(filters, kernel_size, padding="same",
                         activation="softmax",
                         name="gen_final_conv")(res5)
@@ -91,8 +84,7 @@ def get_discriminator(seq_len: int, depth: int,
     res4 = ResBlock(filters, kernel_size, name="dis_resblock4",
                     kernel_initializer=initializer)(res3)
     res5 = ResBlock(filters, kernel_size, name="dis_resblock5",
-                    kernel_initializer=initializer,
-                    end_block=True)(res4)
+                    kernel_initializer=initializer)(res4)
     flat = Flatten()(res5)
     final_dense = Dense(2, activation="softmax", name="dis_final",
                         kernel_initializer=initializer,
