@@ -77,6 +77,7 @@ def train(generator: Model,
           ohe: OneHotEncoder,
           i2l: Dict[int, str],
           optimizers: Optional[Tuple[RMSprop, RMSprop]] = None,
+          train_writer: Optional[tf.summary.SummaryWriter] = None,
           epochs: int = 10000,
           log_epoch: int = 1000,
           batch_size: int = 128) -> Tuple[Model, Model]:
@@ -107,6 +108,16 @@ def train(generator: Model,
                        x, noise,
                        gen_loss_storage,
                        dis_sw_loss_storage)
+
+        if train_writer:
+            with train_writer.as_default():
+                tf.summary.scalar("generator_loss",
+                                  gen_loss_storage.result(),
+                                  step=e)
+                tf.summary.scalar("discriminator_loss",
+                                  dis_sw_loss_storage.result(),
+                                  step=e)
+
         if e % log_epoch == 0:
             examples = generate_psswds(generator, 10, 10, 300, c, i2l)
             logging.info(examples)

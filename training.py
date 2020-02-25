@@ -21,10 +21,15 @@ parser.add_argument("-l", "--log-epoch", type=int, default=10000)
 parser.add_argument("-g", "--generator", default="generator.h5")
 parser.add_argument("-d", "--discriminator", default="discriminator.h5")
 parser.add_argument("--bucket")
+parser.add_argument("--tensorboard", action="store_true", default=False)
 
 args = parser.parse_args()
 
 logging.getLogger().setLevel(logging.DEBUG)
+
+if args.tensorboard:
+    train_summay_dir = "./logs/train"
+    train_summary_writer = tf.summary.create_file_writer(train_summay_dir)
 
 data = get_data(args.file)
 logging.info("dataset loaded")
@@ -50,6 +55,7 @@ trained_gen, trained_dis = train(gen, dis,
                                  train_data,
                                  ohe,
                                  i2l,
+                                 train_writer=train_summary_writer,
                                  epochs=args.epochs,
                                  log_epoch=args.log_epoch)
 generated_psswds = generate_psswds(trained_gen, 1000, 128,
