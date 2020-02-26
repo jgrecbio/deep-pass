@@ -23,9 +23,10 @@ parser.add_argument("-d", "--discriminator", default="discriminator.h5")
 parser.add_argument("--bucket")
 parser.add_argument("--tensorboard", action="store_true", default=False)
 
+parser.add_argument("--discriminator-iter", type=int, default=10)
 parser.add_argument("--noise-size", type=int, default=300)
 parser.add_argument("--filters", type=int, default=128)
-parser.add_argument("--sequence-len", type=int, default=14)
+parser.add_argument("--seq-len", type=int, default=14)
 parser.add_argument("--kernel-size", type=int, default=5)
 
 args = parser.parse_args()
@@ -39,7 +40,7 @@ if args.tensorboard:
 data = get_data(args.file)
 logging.info("dataset loaded")
 if args.test:
-    data = data[:10000]
+    data = data[:100000]
 l2i, i2l = get_label_vectorizer(data)
 logging.info("vectorizer dicts generated")
 vec_data = vectorizes_psswds(data, l2i)
@@ -64,6 +65,7 @@ dis = get_discriminator(args.seq_len,
 logging.info("generator and discriminator generated")
 
 trained_gen, trained_dis = train(gen, dis,
+                                 args.discriminator_iter,
                                  args.noise_size, train_data,
                                  ohe, i2l,
                                  train_writer=train_summary_writer,

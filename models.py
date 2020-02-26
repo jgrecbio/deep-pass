@@ -26,6 +26,12 @@ class ResBlock(Layer):
                        "activation": activation,
                        "kernel_initializer": kernel_initializer}
 
+    def call(self, x):
+        x_c1 = self.conv1(tf.nn.relu(x))
+        x_c2 = self.conv2(x_c1)
+        x_rescaled = 0.3 * x_c2
+        return x + x_rescaled
+
     def get_config(self):
         config = super(ResBlock, self).get_config()
         config.update(self.config)
@@ -34,12 +40,6 @@ class ResBlock(Layer):
     @classmethod
     def from_config(cls, config):
         return cls(**config)
-
-    def call(self, x):
-        x_c1 = self.conv1(tf.nn.relu(x))
-        x_c2 = self.conv2(x_c1)
-        x_rescaled = 0.3 * x_c2
-        return x + x_rescaled
 
 
 def get_generator(seq_len: int,

@@ -41,30 +41,35 @@ def improved_wasserstein(discriminator: Model,
 @tf.function
 def train_step(generator: Model,
                discriminator: Model,
+               discriminator_iter: int,
                generator_optimizer: RMSprop,
                discriminator_optimizer: RMSprop,
                x: tf.Tensor,
                noise: tf.Tensor,
                gen_loss_storage: tf.keras.metrics.Mean,
                dis_sw_loss_storage: tf.keras.metrics.Mean):
-    with tf.GradientTape() as gen_tape, tf.GradientTape() as dis_tape:
+    with tf.GradientTape() as gen_tape,  \
+            tf.GradientTape(persistent=True) as dis_tape:
         fake_x = generator(noise)
-        fake_x_pred = discriminator(fake_x)
-        x_pred = discriminator(x)
+        for i in range(discriminator_iter):
+            with tf.GradientTape() as dis_tape:
+                fake_x_pred = discriminator(fake_x)
+                x_pred = discriminator(x)
+                standard_dis_loss = standard_wassertein(fake_x_pred, x_pred)
+                dis_sw_loss_storage(standard_dis_loss)
+                discriminator_gradients = dis_tape.gradient(
+                    standard_dis_loss, discriminator.trainable_variables
+                )
+                discriminator_optimizer.apply_gradients(
+                    zip(discriminator_gradients,
+                        discriminator.trainable_variables)
+                )
 
         gen_loss = generator_loss(fake_x_pred)
         gen_loss_storage(gen_loss)
-        standard_dis_loss = standard_wassertein(fake_x_pred, x_pred)
-        dis_sw_loss_storage(standard_dis_loss)
 
         generator_gradients = gen_tape.gradient(
             gen_loss, generator.trainable_variables
-        )
-        discriminator_gradients = dis_tape.gradient(
-            standard_dis_loss, discriminator.trainable_variables
-        )
-        discriminator_optimizer.apply_gradients(
-            zip(discriminator_gradients, discriminator.trainable_variables)
         )
         generator_optimizer.apply_gradients(
             zip(generator_gradients, generator.trainable_variables)
@@ -73,6 +78,7 @@ def train_step(generator: Model,
 
 def train(generator: Model,
           discriminator: Model,
+          discriminator_iter: int,
           noise_size: int,
           features: np.ndarray,
           ohe: OneHotEncoder,
@@ -105,6 +111,7 @@ def train(generator: Model,
                                       minval=0., maxval=1,
                                       name="noise")
             train_step(generator, discriminator,
+                       discriminator_iter,
                        generator_optimizer, discriminator_optimizer,
                        x, noise,
                        gen_loss_storage,
@@ -122,8 +129,10 @@ def train(generator: Model,
         if e % log_epoch == 0:
             examples = generate_psswds(generator, 10, 10, 300, c, i2l)
             logging.info(examples)
-            logging.info(gen_loss_storage.result())
-            logging.info(dis_sw_loss_storage.result())
+            logging.info("generator loss: {}".format(
+                gen_loss_storage.result()))
+            logging.info("discriminator loss: {}".format(
+                dis_sw_loss_storage.result()))
 
     return generator, discriminator
 
