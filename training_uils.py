@@ -52,7 +52,7 @@ def train_step(generator: Model,
         fake_x_pred = discriminator(fake_x)
         x_pred = discriminator(x)
 
-        gen_loss = generator_loss(fake_x)
+        gen_loss = generator_loss(fake_x_pred)
         gen_loss_storage(gen_loss)
         standard_dis_loss = standard_wassertein(fake_x_pred, x_pred)
         dis_sw_loss_storage(standard_dis_loss)
