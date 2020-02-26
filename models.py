@@ -64,12 +64,11 @@ def get_generator(seq_len: int,
     res5 = ResBlock(filters, kernel_size, name="gen_resblock5",
                     kernel_initializer=initializer)(res4)
     final_conv = Conv1D(filters, kernel_size, padding="same",
-                        activation="softmax",
+                        activation="relu",
                         name="gen_final_conv")(res5)
     final_dense = TimeDistributed(
         Dense(output_dim, activation="softmax",
-              kernel_initializer=initializer,
-              bias_initializer=initializer))(final_conv)
+              kernel_initializer=initializer))(final_conv)
     return Model(inputs=x, outputs=final_dense)
 
 
@@ -92,7 +91,6 @@ def get_discriminator(seq_len: int, depth: int,
     res5 = ResBlock(filters, kernel_size, name="dis_resblock5",
                     kernel_initializer=initializer)(res4)
     flat = Flatten()(res5)
-    final_dense = Dense(2, activation="softmax", name="dis_final",
-                        kernel_initializer=initializer,
-                        bias_initializer=initializer)(flat)
+    final_dense = Dense(1, activation="sigmoid", name="dis_final",
+                        kernel_initializer=initializer)(flat)
     return Model(inputs=x, outputs=final_dense, name=name)
