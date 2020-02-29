@@ -52,7 +52,10 @@ if __name__ == "__main__":
     optimizer = Adam(learning_rate=args.learning_rate)
     model = compile_model(model, optimizer)
     save_cb = ModelCheckpoint(args.save, save_best_only=True, verbose=1)
-    tensorboard_cb = TensorBoard(log_dir=args.tensorboard_logs)
+    tensorboard_cb = TensorBoard(log_dir=args.tensorboard_logs,
+                                 embeddings_freq=1,
+                                 write_graph=True,
+                                 histogram_freq=1)
     his = model.fit(x_train, y_train,
                     validation_data=(x_test, y_test),
                     batch_size=args.batch_size,
