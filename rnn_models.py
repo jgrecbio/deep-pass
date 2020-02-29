@@ -1,7 +1,7 @@
 from tf.keras.optimizers import Optimizer
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import (LSTM, Dense, TimeDistributed, Embedding,
-                                     Bidirectional)
+                                     Bidirectional, Masking)
 
 
 def get_rnn_model(vocab_size: int,
@@ -11,7 +11,9 @@ def get_rnn_model(vocab_size: int,
                   dropout: float) -> Sequential:
     model = Sequential()
     model.add(Embedding(input_dim=vocab_size,
-                        output_dim=embedding_dim))
+                        output_dim=embedding_dim,
+                        mask_zero=True))
+    model.add(Masking())
     model.add(Bidirectional(LSTM(units=units,
                                  return_sequences=True,
                                  dropout=dropout,
