@@ -1,7 +1,6 @@
 import argparse
-import numpy as np
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import ModelCheckpoint
+from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
 from sklearn.model_selection import train_test_split
 from vectorization import (get_data, get_label_vectorizer,
                            get_ohe, ohe_vectorizes, vectorizes_sequences)
@@ -13,6 +12,7 @@ if __name__ == "__main__":
     # training parameters
     parser.add_argument("-f", "--file")
     parser.add_argument("-l", "--max-len", type=int, default=14)
+    parser.add_argument("--tensorboard-logs")
     parser.add_argument("-s", "--save")
     parser.add_argument("-b", "--batch-size", default=32, type=int)
     parser.add_argument("-e", "--epochs", default=100, type=int)
@@ -51,9 +51,10 @@ if __name__ == "__main__":
                           args.dropout)
     optimizer = Adam(learning_rate=args.learning_rate)
     model = compile_model(model, optimizer)
-    save_callback = ModelCheckpoint(args.save, save_best_only=True, verbose=1)
+    save_cb = ModelCheckpoint(args.save, save_best_only=True, verbose=1)
+    tensorboard_cb = TensorBoard(log_dir=args.tensorboard_logs)
     his = model.fit(x_train, y_train,
                     validation_data=(x_test, y_test),
                     batch_size=args.batch_size,
                     epochs=args.epochs,
-                    callbacks=[save_callback])
+                    callbacks=[save_cb, tensorboard_cb])
