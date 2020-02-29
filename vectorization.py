@@ -5,7 +5,7 @@ from toolz import concat
 
 import numpy as np
 from tensorflow.keras.preprocessing.sequence import pad_sequences
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, LabelBinarizer, label_binarize
 
 
 def get_label_vectorizer(psswds: List[str],
@@ -20,9 +20,9 @@ def get_label_vectorizer(psswds: List[str],
     label2index = {x[0]: i
                    for i, x
                    in enumerate(counter.most_common(vocabulary_size + st), st)}
+    label2index["pad"] = 0
     if len(counter.most_common(vocabulary_size)) > vocabulary_size:
         label2index["unk"] = vocabulary_size + st
-    label2index["pad"] = 0
     if start_end:
         label2index["<start>"] = 1
         label2index["<end>"] = len(label2index)
@@ -61,6 +61,22 @@ def get_ohe(vec_psswds: np.ndarray) -> Tuple[OneHotEncoder, np.ndarray]:
     return ohe
 
 
+def get_ohe_rnn(vec_psswds: List[List[int]]) -> OneHotEncoder:
+    flat_psswds = np.array(list(concat(vec_psswds)))
+    ohe = LabelBinarizer()
+    ohe.fit(np.reshape(flat_psswds, (-1, 1)))
+    return ohe
+
+
+def ohe_vectorizes_rnn(l2i: Dict[str, int],
+                       vec_psswds: List[List[int]]) -> List[np.ndarray]:
+    classes = list(l2i.values())
+    res = []
+    for label in vec_psswds:
+        res.append(label_binarize(label, classes))
+    return res
+
+
 def ohe_vectorizes(ohe: OneHotEncoder,
                    vec_psswds: np.ndarray) -> np.ndarray:
     r, c = vec_psswds.shape
@@ -85,26 +101,17 @@ def construct_batches(x: np.ndarray,
 
 
 def vectorizes_sequences(psswds: Iterable[str],
-                         l2i: Dict[str, int],
-                         maxlen: int) -> Tuple[np.ndarray, np.ndarray]:
+                         l2i: Dict[str, int]) -> Tuple[List[List[int]],
+                                                       List[List[int]]]:
     features = []
     labels = []
     for psswd in psswds:
-        features.append(list(map(lambda x: l2i.get(x, l2i.get("unk")),
-                                 ["<start>"] + list(psswd))))
-        labels.append(list(map(lambda x: l2i.get(x, l2i.get("unk")),
-                               list(psswd) + ["<end>"])))
-    padded_features = pad_sequences(features,
-                                    maxlen=maxlen,
-                                    padding="post",
-                                    truncating="post",
-                                    value=l2i.get("pad", 0))
-    padded_labels = pad_sequences(labels,
-                                  maxlen=maxlen,
-                                  padding="post",
-                                  truncating="post",
-                                  value=l2i.get("pad", 0))
-    return padded_features, padded_labels
+        curr_psswd = []
+        for char in psswd:
+            curr_psswd.append(l2i.get(char, l2i.get("unk", 0)))
+        features.append([l2i["<start>"]] + curr_psswd)
+        labels.append(curr_psswd + [l2i["<end>"]])
+    return features, labels
 
 
 if __name__ == "__main__":

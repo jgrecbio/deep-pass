@@ -1,9 +1,14 @@
+import numpy as np
+from toolz import concat
+import logging
 import argparse
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
 from sklearn.model_selection import train_test_split
 from vectorization import (get_data, get_label_vectorizer,
-                           get_ohe, ohe_vectorizes, vectorizes_sequences)
+                           get_ohe_rnn, ohe_vectorizes_rnn,
+                           vectorizes_sequences)
 from rnn_models import get_rnn_model, compile_model
 
 
@@ -30,27 +35,47 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    logging.getLogger().setLevel(logging.INFO)
+
     data = get_data(args.file)
     if args.test:
-        data = data[:1000]
+        data = data[:1000000]
+    logging.info("data loaded")
     l2i, i2l = get_label_vectorizer(data,
                                     start_end=True,
                                     vocabulary_size=args.vocabulary_size)
-    vec_features, vec_labels = vectorizes_sequences(data, l2i, args.max_len)
-    ohe = get_ohe(vec_labels)
-    ohe_vec_labels = ohe_vectorizes(ohe, vec_labels)
+    logging.info("vectorizer dicts created")
+    print(len(l2i))
+    vec_features, vec_labels, = vectorizes_sequences(data, l2i)
+    padded_vec_features = pad_sequences(vec_features,
+                                        maxlen=args.max_len,
+                                        truncating="post",
+                                        padding="post",
+                                        value=0.)
+    padded_vec_labels = pad_sequences(ohe_vectorizes_rnn(l2i, vec_labels),
+                                      maxlen=args.max_len,
+                                      truncating="post",
+                                      padding="post",
+                                      value=0.)
 
-    x_train, x_test, y_train, y_test = train_test_split(vec_features,
-                                                        ohe_vec_labels,
+    print(padded_vec_labels.shape)
+    print(padded_vec_features.shape)
+    print(np.max(padded_vec_features))
+    logging.info("ohe vectorization performed")
+
+    x_train, x_test, y_train, y_test = train_test_split(padded_vec_features,
+                                                        padded_vec_labels,
                                                         test_size=0.1)
+    logging.info("train test split done")
 
-    model = get_rnn_model(len(l2i) - 1,
+    model = get_rnn_model(len(l2i),
                           args.embedding_size,
                           args.units,
                           args.neurons,
                           args.dropout)
     optimizer = Adam(learning_rate=args.learning_rate)
     model = compile_model(model, optimizer)
+    logging.info("model compiled")
     save_cb = ModelCheckpoint(args.save, save_best_only=True, verbose=1)
     tensorboard_cb = TensorBoard(log_dir=args.tensorboard_logs,
                                  embeddings_freq=1,
