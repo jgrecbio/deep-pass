@@ -13,19 +13,19 @@ def get_label_vectorizer(psswds: List[str],
                          vocabulary_size: int = 2048) -> Tuple[Dict[str, int],
                                                                Dict[int, str]]:
     if start_end:
-        st = 3
+        st = 2
     else:
         st = 1
     counter = Counter(concat(psswds))
     label2index = {x[0]: i
                    for i, x
-                   in enumerate(st, counter.most_common(vocabulary_size + st))}
-    label2index["unk"] = min(vocabulary_size + st,
-                             len(counter.most_common()))
+                   in enumerate(counter.most_common(vocabulary_size + st), st)}
+    if len(counter.most_common(vocabulary_size)) > vocabulary_size:
+        label2index["unk"] = vocabulary_size + st
     label2index["pad"] = 0
     if start_end:
         label2index["<start>"] = 1
-        label2index["<end>"] = 2
+        label2index["<end>"] = len(label2index)
     index2label = {i: label for (label, i) in label2index.items()}
     return label2index, index2label
 
@@ -84,16 +84,15 @@ def construct_batches(x: np.ndarray,
         yield x[i: i + batch_size]
 
 
-def vectorizes_sequence(psswds: Iterable[str],
-                        l2i: Dict[str, int],
-                        ohe: OneHotEncoder,
-                        maxlen: int) -> Tuple[np.ndarray, np.ndarray]:
+def vectorizes_sequences(psswds: Iterable[str],
+                         l2i: Dict[str, int],
+                         maxlen: int) -> Tuple[np.ndarray, np.ndarray]:
     features = []
     labels = []
     for psswd in psswds:
-        features.append(list(map(lambda x: l2i.get(x, l2i["unk"]),
+        features.append(list(map(lambda x: l2i.get(x, l2i.get("unk")),
                                  ["<start>"] + list(psswd))))
-        labels.append(list(map(lambda x: l2i.get(x, l2i["unk"]),
+        labels.append(list(map(lambda x: l2i.get(x, l2i.get("unk")),
                                list(psswd) + ["<end>"])))
     padded_features = pad_sequences(features,
                                     maxlen=maxlen,
@@ -106,7 +105,6 @@ def vectorizes_sequence(psswds: Iterable[str],
                                   truncating="post",
                                   value=l2i.get("pad", 0))
     return padded_features, padded_labels
-
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-from tf.keras.optimizers import Optimizer
+from tensorflow.keras.optimizers import Optimizer
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import (LSTM, Dense, TimeDistributed, Embedding,
                                      Bidirectional, Masking)
@@ -34,6 +34,6 @@ def get_rnn_model(vocab_size: int,
 def compile_model(model: Sequential,
                   optimizer: Optimizer) -> Sequential:
     model.compile(optimizer=optimizer,
-                  metrics="accuracy",
+                  metrics=["accuracy"],
                   loss="categorical_crossentropy")
     return model
