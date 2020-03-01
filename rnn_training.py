@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 from vectorization import (get_data, get_label_vectorizer,
                            vectorizes_sequences, get_generator_rnn)
 from rnn_models import get_rnn_model, compile_model
+from utils import get_client, upload
 
 
 if __name__ == "__main__":
@@ -15,7 +16,6 @@ if __name__ == "__main__":
     parser.add_argument("-f", "--file")
     parser.add_argument("-l", "--max-len", type=int, default=14)
     parser.add_argument("--tensorboard-logs")
-    parser.add_argument("-s", "--save")
     parser.add_argument("-b", "--batch-size", default=32, type=int)
     parser.add_argument("-e", "--epochs", default=100, type=int)
     parser.add_argument("-t", "--test", action="store_true", default=False)
@@ -29,6 +29,10 @@ if __name__ == "__main__":
 
     # optimizer parameters
     parser.add_argument("--learning-rate", type=float, default=0.001)
+
+    # save parameters
+    parser.add_argument("-s", "--save")
+    parser.add_argument("--bucket")
 
     args = parser.parse_args()
 
@@ -76,3 +80,7 @@ if __name__ == "__main__":
                     validation_steps=test_nb_steps,
                     epochs=args.epochs,
                     callbacks=[save_cb, tensorboard_cb])
+
+    if args.bucket:
+        client = get_client()
+        upload(args.save, args.bucket, args.save)

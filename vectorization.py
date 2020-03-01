@@ -1,4 +1,3 @@
-from copy import deepcopy
 from typing import List, Tuple, Dict, Iterable
 from collections import Counter
 from toolz import concat
