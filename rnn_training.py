@@ -1,14 +1,11 @@
-import numpy as np
-from toolz import concat
+from math import floor
 import logging
 import argparse
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
 from sklearn.model_selection import train_test_split
 from vectorization import (get_data, get_label_vectorizer,
-                           get_ohe_rnn, ohe_vectorizes_rnn,
-                           vectorizes_sequences)
+                           vectorizes_sequences, get_generator_rnn)
 from rnn_models import get_rnn_model, compile_model
 
 
@@ -45,28 +42,20 @@ if __name__ == "__main__":
                                     start_end=True,
                                     vocabulary_size=args.vocabulary_size)
     logging.info("vectorizer dicts created")
-    print(len(l2i))
     vec_features, vec_labels, = vectorizes_sequences(data, l2i)
-    padded_vec_features = pad_sequences(vec_features,
-                                        maxlen=args.max_len,
-                                        truncating="post",
-                                        padding="post",
-                                        value=0.)
-    padded_vec_labels = pad_sequences(ohe_vectorizes_rnn(l2i, vec_labels),
-                                      maxlen=args.max_len,
-                                      truncating="post",
-                                      padding="post",
-                                      value=0.)
+    logging.info("vectorization performed")
 
-    print(padded_vec_labels.shape)
-    print(padded_vec_features.shape)
-    print(np.max(padded_vec_features))
-    logging.info("ohe vectorization performed")
-
-    x_train, x_test, y_train, y_test = train_test_split(padded_vec_features,
-                                                        padded_vec_labels,
+    x_train, x_test, y_train, y_test = train_test_split(vec_features,
+                                                        vec_labels,
                                                         test_size=0.1)
     logging.info("train test split done")
+
+    train_nb_steps = floor(len(x_train) / args.batch_size)
+    train_gen = get_generator_rnn(l2i, x_train, y_train,
+                                  args.max_len, args.batch_size)
+    test_nb_steps = floor(len(x_test) / args.batch_size)
+    test_gen = get_generator_rnn(l2i, x_test, y_test,
+                                 args.max_len, args.batch_size)
 
     model = get_rnn_model(len(l2i),
                           args.embedding_size,
@@ -81,8 +70,9 @@ if __name__ == "__main__":
                                  embeddings_freq=1,
                                  write_graph=True,
                                  histogram_freq=1)
-    his = model.fit(x_train, y_train,
-                    validation_data=(x_test, y_test),
-                    batch_size=args.batch_size,
+    his = model.fit(train_gen,
+                    steps_per_epoch=train_nb_steps,
+                    validation_data=test_gen,
+                    validation_steps=test_nb_steps,
                     epochs=args.epochs,
                     callbacks=[save_cb, tensorboard_cb])

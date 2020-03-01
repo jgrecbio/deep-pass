@@ -77,6 +77,30 @@ def ohe_vectorizes_rnn(l2i: Dict[str, int],
     return res
 
 
+def get_generator_rnn(l2i: Dict[str, int],
+                      x: List[np.ndarray],
+                      y: List[np.ndarray],
+                      max_len: int,
+                      batch_size: int) -> Iterable[Tuple[np.ndarray,
+                                                         np.ndarray]]:
+    while True:
+        x_gen = construct_batches(x, batch_size)
+        y_gen = construct_batches(x, batch_size)
+        gen = zip(x_gen, y_gen)
+        for (bx, by) in gen:
+            pbx = pad_sequences(bx,
+                                maxlen=max_len,
+                                truncating="post",
+                                padding="post",
+                                value=0.)
+            pby = pad_sequences(ohe_vectorizes_rnn(l2i, by),
+                                maxlen=max_len,
+                                truncating="post",
+                                padding="post",
+                                value=0.)
+            yield pbx, pby
+
+
 def ohe_vectorizes(ohe: OneHotEncoder,
                    vec_psswds: np.ndarray) -> np.ndarray:
     r, c = vec_psswds.shape
@@ -94,7 +118,6 @@ def get_data(path: str) -> List[str]:
 
 def construct_batches(x: np.ndarray,
                       batch_size: int = 128) -> Iterable[np.ndarray]:
-    x = deepcopy(x)
     np.random.shuffle(x)
     for i in range(0, len(x), batch_size):
         yield x[i: i + batch_size]
