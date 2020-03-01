@@ -1,3 +1,5 @@
+import os
+import json
 from math import floor
 import logging
 import argparse
@@ -15,10 +17,10 @@ if __name__ == "__main__":
     # training parameters
     parser.add_argument("-f", "--file")
     parser.add_argument("-l", "--max-len", type=int, default=14)
-    parser.add_argument("--tensorboard-logs")
     parser.add_argument("-b", "--batch-size", default=32, type=int)
-    parser.add_argument("-e", "--epochs", default=100, type=int)
+    parser.add_argument("-e", "--epochs", default=10, type=int)
     parser.add_argument("-t", "--test", action="store_true", default=False)
+    parser.add_argument("--tensorboard-logs")
 
     # model parameters
     parser.add_argument("-u", "--units", type=int, default=150)
@@ -33,6 +35,8 @@ if __name__ == "__main__":
     # save parameters
     parser.add_argument("-s", "--save")
     parser.add_argument("--bucket")
+    parser.add_argument("--model-fname", default="rnn.h5")
+    parser.add_argument("--encoder-fname", default="encoder.json")
 
     args = parser.parse_args()
 
@@ -45,6 +49,8 @@ if __name__ == "__main__":
     l2i, i2l = get_label_vectorizer(data,
                                     start_end=True,
                                     vocabulary_size=args.vocabulary_size)
+    with open(os.join.path(args.save, args.encoder_fname), 'w') as f:
+        json.dump((l2i, i2l), f)
     logging.info("vectorizer dicts created")
     vec_features, vec_labels, = vectorizes_sequences(data, l2i)
     logging.info("vectorization performed")
@@ -69,7 +75,9 @@ if __name__ == "__main__":
     optimizer = Adam(learning_rate=args.learning_rate)
     model = compile_model(model, optimizer)
     logging.info("model compiled")
-    save_cb = ModelCheckpoint(args.save, save_best_only=True, verbose=1)
+    save_cb = ModelCheckpoint(os.path.join(args.save,
+                                           args.model_fname),
+                              save_best_only=True, verbose=1)
     tensorboard_cb = TensorBoard(log_dir=args.tensorboard_logs,
                                  embeddings_freq=1,
                                  write_graph=True,
@@ -83,4 +91,7 @@ if __name__ == "__main__":
 
     if args.bucket:
         client = get_client()
-        upload(args.save, args.bucket, args.save)
+        upload(os.path.join(args.save, args.model_fname),
+               args.bucket, args.save)
+        upload(os.path.join(args.save, args.encoder_fname),
+               args.bucket, args.save)
