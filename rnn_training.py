@@ -49,7 +49,7 @@ if __name__ == "__main__":
     l2i, i2l = get_label_vectorizer(data,
                                     start_end=True,
                                     vocabulary_size=args.vocabulary_size)
-    with open(os.join.path(args.save, args.encoder_fname), 'w') as f:
+    with open(os.path.join(args.save, args.encoder_fname), 'w') as f:
         json.dump((l2i, i2l), f)
     logging.info("vectorizer dicts created")
     vec_features, vec_labels, = vectorizes_sequences(data, l2i)
