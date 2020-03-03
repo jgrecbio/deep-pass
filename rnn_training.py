@@ -17,14 +17,14 @@ if __name__ == "__main__":
     # training parameters
     parser.add_argument("-f", "--file")
     parser.add_argument("-l", "--max-len", type=int, default=14)
-    parser.add_argument("-b", "--batch-size", default=32, type=int)
+    parser.add_argument("-b", "--batch-size", default=64, type=int)
     parser.add_argument("-e", "--epochs", default=10, type=int)
     parser.add_argument("-t", "--test", action="store_true", default=False)
     parser.add_argument("--tensorboard-logs")
 
     # model parameters
-    parser.add_argument("-u", "--units", type=int, default=150)
-    parser.add_argument("-n", "--neurons", type=int, default=150)
+    parser.add_argument("-u", "--units", type=int, default=300)
+    parser.add_argument("-n", "--neurons", type=int, default=300)
     parser.add_argument("--embedding-size", type=int, default=300)
     parser.add_argument("--vocabulary-size", type=int, default=2048)
     parser.add_argument("--dropout", type=float, default=0.2)
