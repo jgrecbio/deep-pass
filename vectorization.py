@@ -1,4 +1,4 @@
-from typing import List, Tuple, Dict, Iterable
+from typing import List, Tuple, Dict, Iterable, Union
 from collections import Counter
 from toolz import concat
 
@@ -107,12 +107,29 @@ def ohe_vectorizes(ohe: OneHotEncoder,
     return ohe.transform(flat_psswds).reshape((r, c, -1))
 
 
-def get_data(path: str) -> List[str]:
+def get_data(path: str,
+             get_counts: bool = False) -> Union[List[str],
+                                                Tuple[List[str], List[int]]]:
+    counts = []
     psswds = []
     with open(path, encoding="ISO-8859-1") as f:
         for line in f.readlines():
-            psswds.append(line.split(' ')[-1].strip())
-    return psswds
+            count, psswd = line.split(' ', 1)
+            psswds.append(psswd.strip())
+            if get_counts:
+                counts.append(int(count))
+    if get_counts:
+        return psswds, counts
+    else:
+        return psswds
+
+
+def get_words(path: str) -> List[str]:
+    words = []
+    with open(path) as f:
+        for line in f.readlines():
+            words.append(line.strip())
+    return words
 
 
 def construct_batches(x: np.ndarray,
