@@ -79,10 +79,8 @@ if __name__ == "__main__":
     optimizer = Adam(learning_rate=args.learning_rate)
     model = compile_model(model, optimizer)
     logging.info("model compiled")
-    save_cb = ModelCheckpoint(
-        os.path.join(os.path.join(args.save, args.model_fname),
-                     args.model_fname),
-        save_best_only=True, verbose=1)
+    save_cb = ModelCheckpoint(os.path.join(args.save, args.model_fname),
+                              save_best_only=True, verbose=1)
     tensorboard_cb = TensorBoard(log_dir=args.tensorboard_logs,
                                  embeddings_freq=1,
                                  write_graph=True,
