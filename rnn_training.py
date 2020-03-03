@@ -6,7 +6,7 @@ import argparse
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
 from sklearn.model_selection import train_test_split
-from vectorization import (get_data, get_label_vectorizer,
+from vectorization import (get_data, get_label_vectorizer, get_words,
                            vectorizes_sequences, get_generator_rnn)
 from rnn_models import get_rnn_model, compile_model
 from utils import get_client, upload
@@ -16,6 +16,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # training parameters
     parser.add_argument("-f", "--file")
+    parser.add_argument("--english-words")
     parser.add_argument("-l", "--max-len", type=int, default=14)
     parser.add_argument("-b", "--batch-size", default=64, type=int)
     parser.add_argument("-e", "--epochs", default=10, type=int)
@@ -45,6 +46,9 @@ if __name__ == "__main__":
     data = get_data(args.file)
     if args.test:
         data = data[:1000000]
+    if args.english_words:
+        words = get_words(args.english_words)
+    data = data + words
     logging.info("data loaded")
     l2i, i2l = get_label_vectorizer(data,
                                     start_end=True,
