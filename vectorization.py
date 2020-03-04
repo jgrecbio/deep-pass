@@ -19,7 +19,7 @@ def get_label_vectorizer(psswds: List[str],
     label2index = {x[0]: i
                    for i, x
                    in enumerate(counter.most_common(vocabulary_size + st), st)}
-    label2index["pad"] = 0
+    label2index["<pad>"] = 0
     if len(counter.most_common(vocabulary_size)) > vocabulary_size:
         label2index["unk"] = vocabulary_size + st
     if start_end:
@@ -43,13 +43,13 @@ def vectorizes_psswds(psswds: List[str],
     vectorized_psswds = []
     for psswd in psswds:
         vectorized_psswds.append(
-            list(map(lambda x: l2i.get(x, l2i["unk"]), psswd))
+            list(map(lambda x: l2i.get(x, l2i["<unk>"]), psswd))
         )
     return pad_sequences(vectorized_psswds,
                          maxlen=maxlen,
                          padding="post",
                          truncating="post",
-                         value=l2i.get("pad", 0))
+                         value=l2i.get("<pad>", 0))
 
 
 def get_ohe(vec_psswds: np.ndarray) -> Tuple[OneHotEncoder, np.ndarray]:
@@ -83,8 +83,10 @@ def get_generator_rnn(l2i: Dict[str, int],
                       batch_size: int) -> Iterable[Tuple[np.ndarray,
                                                          np.ndarray]]:
     while True:
+        np.random.shuffle(x)
+        np.random.shuffle(y)
         x_gen = construct_batches(x, batch_size)
-        y_gen = construct_batches(x, batch_size)
+        y_gen = construct_batches(y, batch_size)
         gen = zip(x_gen, y_gen)
         for (bx, by) in gen:
             pbx = pad_sequences(bx,
@@ -147,7 +149,7 @@ def vectorizes_sequences(psswds: Iterable[str],
     for psswd in psswds:
         curr_psswd = []
         for char in psswd:
-            curr_psswd.append(l2i.get(char, l2i.get("unk", 0)))
+            curr_psswd.append(l2i.get(char, l2i.get("<unk>", 0)))
         features.append([l2i["<start>"]] + curr_psswd)
         labels.append(curr_psswd + [l2i["<end>"]])
     return features, labels
