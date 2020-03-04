@@ -15,13 +15,15 @@ from utils import get_client, upload
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # training parameters
-    parser.add_argument("-f", "--file")
-    parser.add_argument("--english-words")
-    parser.add_argument("-l", "--max-len", type=int, default=14)
+    parser.add_argument("-f", "--file", help="File with passwords")
+    parser.add_argument("--english-words",
+                        help="File containing english words")
+    parser.add_argument("-l", "--max-len", type=int, default=14,
+                        help="Length of passwords")
     parser.add_argument("-b", "--batch-size", default=64, type=int)
     parser.add_argument("-e", "--epochs", default=10, type=int)
     parser.add_argument("-t", "--test", action="store_true", default=False)
-    parser.add_argument("--tensorboard-logs")
+    parser.add_argument("--tensorboard-logs", default="log/")
 
     # model parameters
     parser.add_argument("-u", "--units", type=int, default=300)
@@ -48,7 +50,7 @@ if __name__ == "__main__":
         data = data[:1000000]
     if args.english_words:
         words = get_words(args.english_words)
-    data = data + words
+        data = data + words
     logging.info("data loaded")
     l2i, i2l = get_label_vectorizer(data,
                                     start_end=True,
@@ -80,6 +82,7 @@ if __name__ == "__main__":
     model = compile_model(model, optimizer)
     logging.info("model compiled")
     save_cb = ModelCheckpoint(os.path.join(args.save, args.model_fname),
+                              monitor="val_acc",
                               save_best_only=True, verbose=1)
     tensorboard_cb = TensorBoard(log_dir=args.tensorboard_logs,
                                  embeddings_freq=1,
@@ -94,7 +97,12 @@ if __name__ == "__main__":
 
     if args.bucket:
         client = get_client()
-        upload(os.path.join(args.save, args.model_fname),
-               args.bucket, args.save)
-        upload(os.path.join(args.save, args.encoder_fname),
-               args.bucket, args.save)
+        upload(client,
+               os.path.join(args.save,
+                            args.model_fname),
+               args.bucket,
+               args.save)
+        upload(client,
+               os.path.join(args.save, args.encoder_fname),
+               args.bucket,
+               args.save)
