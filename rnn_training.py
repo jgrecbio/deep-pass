@@ -47,7 +47,9 @@ if __name__ == "__main__":
 
     data = get_data(args.file)
     if args.test:
-        data = data[:1000000]
+        data = data[:1000]
+    else:
+        data = data[:3000000]
     if args.english_words:
         words = get_words(args.english_words)
         data = data + words
