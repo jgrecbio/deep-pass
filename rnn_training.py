@@ -26,8 +26,10 @@ if __name__ == "__main__":
     parser.add_argument("--tensorboard-logs", default="log/")
 
     # model parameters
-    parser.add_argument("-u", "--units", type=int, default=300)
-    parser.add_argument("-n", "--neurons", type=int, default=300)
+    parser.add_argument("-u", "--units", type=int, default=300,
+                        help="number of rnn neurons")
+    parser.add_argument("-n", "--neurons", type=int, default=300,
+                        help="number of neurons in dense layers")
     parser.add_argument("--embedding-size", type=int, default=300)
     parser.add_argument("--vocabulary-size", type=int, default=2048)
     parser.add_argument("--dropout", type=float, default=0.2)
@@ -46,13 +48,13 @@ if __name__ == "__main__":
     logging.getLogger().setLevel(logging.INFO)
 
     data = get_data(args.file)
-    if args.test:
-        data = data[:1000]
-    else:
-        data = data[:3000000]
     if args.english_words:
         words = get_words(args.english_words)
         data = data + words
+    data = data[:3000000]
+    if args.test:
+        data = data[:1000]
+    print(len(data))
     logging.info("data loaded")
     l2i, i2l = get_label_vectorizer(data,
                                     start_end=True,
@@ -60,7 +62,7 @@ if __name__ == "__main__":
     with open(os.path.join(args.save, args.encoder_fname), 'w') as f:
         json.dump((l2i, i2l), f)
     logging.info("vectorizer dicts created")
-    vec_features, vec_labels, = vectorizes_sequences(data, l2i)
+    vec_features, vec_labels = vectorizes_sequences(data, l2i)
     logging.info("vectorization performed")
 
     x_train, x_test, y_train, y_test = train_test_split(vec_features,
@@ -73,7 +75,8 @@ if __name__ == "__main__":
                                   args.max_len, args.batch_size)
     test_nb_steps = floor(len(x_test) / args.batch_size)
     test_gen = get_generator_rnn(l2i, x_test, y_test,
-                                 args.max_len, args.batch_size)
+                                 args.max_len, args.batch_size,
+                                 training=False)
 
     model = get_rnn_model(len(l2i),
                           args.embedding_size,
@@ -84,8 +87,8 @@ if __name__ == "__main__":
     model = compile_model(model, optimizer)
     logging.info("model compiled")
     save_cb = ModelCheckpoint(os.path.join(args.save, args.model_fname),
-                              monitor="val_acc",
-                              save_best_only=True, verbose=1)
+                              monitor="val_loss",
+                              save_best_only=True, verbose=0)
     tensorboard_cb = TensorBoard(log_dir=args.tensorboard_logs,
                                  embeddings_freq=1,
                                  write_graph=True,
@@ -95,7 +98,8 @@ if __name__ == "__main__":
                     validation_data=test_gen,
                     validation_steps=test_nb_steps,
                     epochs=args.epochs,
-                    callbacks=[save_cb, tensorboard_cb])
+                    callbacks=[save_cb, tensorboard_cb],
+                    verbose=1)
 
     if args.bucket:
         client = get_client()

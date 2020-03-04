@@ -80,11 +80,13 @@ def get_generator_rnn(l2i: Dict[str, int],
                       x: List[np.ndarray],
                       y: List[np.ndarray],
                       max_len: int,
-                      batch_size: int) -> Iterable[Tuple[np.ndarray,
-                                                         np.ndarray]]:
+                      batch_size: int,
+                      training: bool = True) -> Iterable[Tuple[np.ndarray,
+                                                               np.ndarray]]:
     while True:
-        np.random.shuffle(x)
-        np.random.shuffle(y)
+        if training:
+            np.random.shuffle(x)
+            np.random.shuffle(y)
         x_gen = construct_batches(x, batch_size)
         y_gen = construct_batches(y, batch_size)
         gen = zip(x_gen, y_gen)

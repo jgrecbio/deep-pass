@@ -34,6 +34,6 @@ def get_rnn_model(vocab_size: int,
 def compile_model(model: Sequential,
                   optimizer: Optimizer) -> Sequential:
     model.compile(optimizer=optimizer,
-                  metrics=["accuracy"],
+                  metrics=["acc"],
                   loss="categorical_crossentropy")
     return model
