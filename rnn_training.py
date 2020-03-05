@@ -20,15 +20,15 @@ if __name__ == "__main__":
                         help="File containing english words")
     parser.add_argument("-l", "--max-len", type=int, default=14,
                         help="Length of passwords")
-    parser.add_argument("-b", "--batch-size", default=64, type=int)
+    parser.add_argument("-b", "--batch-size", default=128, type=int)
     parser.add_argument("-e", "--epochs", default=10, type=int)
     parser.add_argument("-t", "--test", action="store_true", default=False)
     parser.add_argument("--tensorboard-logs", default="log/")
 
     # model parameters
-    parser.add_argument("-u", "--units", type=int, default=300,
+    parser.add_argument("-u", "--units", type=int, default=500,
                         help="number of rnn neurons")
-    parser.add_argument("-n", "--neurons", type=int, default=300,
+    parser.add_argument("-n", "--neurons", type=int, default=500,
                         help="number of neurons in dense layers")
     parser.add_argument("--embedding-size", type=int, default=300)
     parser.add_argument("--vocabulary-size", type=int, default=2048)
@@ -39,9 +39,9 @@ if __name__ == "__main__":
 
     # save parameters
     parser.add_argument("-s", "--save")
-    parser.add_argument("--bucket")
     parser.add_argument("--model-fname", default="rnn.h5")
     parser.add_argument("--encoder-fname", default="encoder.json")
+    parser.add_argument("--bucket")
 
     args = parser.parse_args()
 
@@ -50,7 +50,7 @@ if __name__ == "__main__":
     data = get_data(args.file)
     if args.english_words:
         words = get_words(args.english_words)
-        data = data + words
+        data = words + data
     data = data[:3000000]
     if args.test:
         data = data[:1000]
