@@ -1,6 +1,6 @@
 import os
 import json
-from math import floor
+from math import ceil
 import logging
 import argparse
 from tensorflow.keras.optimizers import Adam
@@ -70,10 +70,10 @@ if __name__ == "__main__":
                                                         test_size=0.1)
     logging.info("train test split done")
 
-    train_nb_steps = floor(len(x_train) / args.batch_size)
+    train_nb_steps = ceil(len(x_train) / args.batch_size)
     train_gen = get_generator_rnn(l2i, x_train, y_train,
                                   args.max_len, args.batch_size)
-    test_nb_steps = floor(len(x_test) / args.batch_size)
+    test_nb_steps = ceil(len(x_test) / args.batch_size)
     test_gen = get_generator_rnn(l2i, x_test, y_test,
                                  args.max_len, args.batch_size,
                                  training=False)
